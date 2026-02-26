@@ -734,7 +734,7 @@ async def closelobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Запуск бота"""
     # Получаем токен из переменной окружения
-    TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8325496741:AAFCyqOzmMgyV25-1Br2d1cR3wI_UHQPjYk")
+    TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
     if not TOKEN:
         print("❌ Ошибка: не установлена переменная окружения TELEGRAM_BOT_TOKEN")
