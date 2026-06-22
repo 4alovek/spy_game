@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from game_logic import GameResult, Lobby
+from game.game_logic import GameResult, Lobby
 
 
 class LobbyGameLogicTests(unittest.TestCase):
@@ -27,7 +27,7 @@ class LobbyGameLogicTests(unittest.TestCase):
         self.assertFalse(self.lobby.add_custom_workplace(self.lobby.WORKPLACES[0]))
 
     def test_start_game_assigns_one_spy_and_workplace_for_workers(self):
-        with patch("game_logic.random.choice", side_effect=["Банк", self.lobby.players[1]]):
+        with patch("game.game_logic.random.choice", side_effect=["Банк", self.lobby.players[1]]):
             started = self.lobby.start_game()
 
         self.assertTrue(started)
@@ -42,7 +42,7 @@ class LobbyGameLogicTests(unittest.TestCase):
         self.assertIsNone(spies[0].workplace)
 
     def test_spy_guess_and_vote_result_majority_yes(self):
-        with patch("game_logic.random.choice", side_effect=["Школа", self.lobby.players[0]]):
+        with patch("game.game_logic.random.choice", side_effect=["Школа", self.lobby.players[0]]):
             self.assertTrue(self.lobby.start_game())
 
         spy = self.lobby.spy
@@ -55,7 +55,7 @@ class LobbyGameLogicTests(unittest.TestCase):
         self.assertEqual(self.lobby.get_vote_result(), "spy_win")
 
     def test_end_game_resets_round_state(self):
-        with patch("game_logic.random.choice", side_effect=["Театр", self.lobby.players[2]]):
+        with patch("game.game_logic.random.choice", side_effect=["Театр", self.lobby.players[2]]):
             self.assertTrue(self.lobby.start_game())
         self.lobby.stop_game_by_spy(self.lobby.spy.user_id)
         self.lobby.set_spy_guess("Театр")

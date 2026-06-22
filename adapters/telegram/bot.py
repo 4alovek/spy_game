@@ -1,7 +1,7 @@
 import os
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
-from game_logic import GameManager, GameResult, Lobby
+from game.game_logic import GameManager, GameResult, Lobby
 
 # Инициализация менеджера игр
 game_manager = GameManager()

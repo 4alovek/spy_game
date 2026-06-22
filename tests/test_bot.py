@@ -4,7 +4,7 @@ import types
 from types import SimpleNamespace
 
 try:
-    import bot
+    from adapters.telegram import bot
 except ModuleNotFoundError as exc:
     if exc.name != "telegram":
         raise
@@ -68,9 +68,9 @@ except ModuleNotFoundError as exc:
     telegram_ext_stub.ContextTypes = ContextTypes
     sys.modules["telegram.ext"] = telegram_ext_stub
 
-    import bot
+    from adapters.telegram import bot
 
-from game_logic import GameManager
+from game.game_logic import GameManager
 
 
 class FakeMessage:

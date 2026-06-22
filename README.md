@@ -1,14 +1,17 @@
-# Spy Game Telegram Bot
+# Spy Game
 
-Телеграм-бот для игры "Шпион" с лобби, ролями, остановкой игры и голосованием.
+Игра "Шпион" с лобби, ролями, остановкой игры и голосованием. Доступна в двух
+видах поверх общей логики: Telegram-бот и веб-приложение.
 
 ## Структура
 
-- `bot.py` - основной бот с обработчиками команд Telegram.
-- `game_logic.py` - логика лобби и механики игры.
-- `workplaces.py` - базовый список мест работы.
-- `Makefile` - команды запуска и обслуживания.
-- `requirements.txt` - зависимости Python.
+- `game/` — чистая игровая логика (`game_logic.py`, `workplaces.py`), без I/O.
+- `adapters/telegram/bot.py` — Telegram-бот.
+- `adapters/web/` — веб-адаптер на FastAPI + WebSocket (`app.py`, `ws_manager.py`, `protocol.py`).
+- `frontend/` — веб-клиент на vanilla JS.
+- `Makefile` — команды запуска и обслуживания.
+- `requirements.txt` — зависимости Python.
+- `docs/web-app-plan.md` — план развития веб-версии.
 
 ## Установка
 
@@ -26,6 +29,8 @@ export TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
 
 ## Запуск
 
+### Telegram-бот
+
 Запуск в текущей консоли:
 
 ```bash
@@ -36,6 +41,21 @@ make run
 
 ```bash
 make run-bg
+```
+
+### Веб-приложение
+
+```bash
+make run-web        # http://127.0.0.1:8000
+```
+
+Откройте адрес в нескольких вкладках/устройствах: создайте лобби, поделитесь
+4-значным кодом, остальные входят по нему. Минимум 3 игрока для старта.
+
+## Тесты
+
+```bash
+make test           # или: python -m unittest discover -s tests
 ```
 
 ## Управление процессом
@@ -64,11 +84,11 @@ make stop
 make restart
 ```
 
-## Переопределение файла бота
+## Переопределение модуля бота
 
-По умолчанию `Makefile` запускает `bot.py`.  
-Чтобы запускать другой файл:
+По умолчанию `Makefile` запускает модуль `adapters.telegram.bot`.
+Чтобы запустить другой:
 
 ```bash
-make run BOT_FILE=telegram_bot.py
+make run BOT_MODULE=adapters.telegram.bot
 ```

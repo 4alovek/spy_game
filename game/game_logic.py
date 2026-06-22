@@ -1,7 +1,7 @@
 import random
 from typing import List, Optional, Dict
 from enum import Enum
-from workplaces import WORKPLACES as BASE_WORKPLACES
+from game.workplaces import WORKPLACES as BASE_WORKPLACES
 
 
 class GameResult(Enum):

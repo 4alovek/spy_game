@@ -1,16 +1,24 @@
 PYTHON ?= python
-BOT_FILE ?= bot.py
+BOT_MODULE ?= adapters.telegram.bot
+WEB_HOST ?= 127.0.0.1
+WEB_PORT ?= 8000
 LOG_FILE ?= bot.log
 PID_FILE ?= .bot.pid
 
-.PHONY: run run-bg status logs stop restart
+.PHONY: run run-bg run-web test status logs stop restart
 
 run:
-	$(PYTHON) ./$(BOT_FILE)
+	$(PYTHON) -m $(BOT_MODULE)
 
 run-bg:
-	nohup $(PYTHON) ./$(BOT_FILE) > $(LOG_FILE) 2>&1 & echo $$! > $(PID_FILE)
+	nohup $(PYTHON) -m $(BOT_MODULE) > $(LOG_FILE) 2>&1 & echo $$! > $(PID_FILE)
 	@echo "Bot started in background. PID: $$(cat $(PID_FILE))"
+
+run-web:
+	$(PYTHON) -m uvicorn adapters.web.app:app --host $(WEB_HOST) --port $(WEB_PORT) --reload
+
+test:
+	$(PYTHON) -m unittest discover -s tests
 
 status:
 	@if [ -f "$(PID_FILE)" ] && ps -p "$$(cat $(PID_FILE))" > /dev/null 2>&1; then \
