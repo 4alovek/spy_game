@@ -1,44 +1,9 @@
-import unittest
-
-try:
-    from fastapi.testclient import TestClient
-    HAS_FASTAPI = True
-except ModuleNotFoundError:
-    HAS_FASTAPI = False
-
-if HAS_FASTAPI:
-    from adapters.web import app as webapp
+from web_base import WebTestBase, drain
 
 
-def drain(ws, n):
-    """Прочитать ровно n сообщений и вернуть последнее состояние.
-
-    Каждое действие/подключение шлёт ровно одно состояние каждому сокету в лобби,
-    поэтому количество сообщений детерминировано."""
-    state = None
-    for _ in range(n):
-        msg = ws.receive_json()
-        if msg["type"] == "state":
-            state = msg
-    return state
-
-
-@unittest.skipUnless(HAS_FASTAPI, "fastapi is not installed")
-class WebAdapterTests(unittest.TestCase):
-    def setUp(self):
-        # Чистое состояние на каждый тест (модульные глобалы переиспользуются)
-        from game.game_logic import GameManager
-        webapp.game_manager = GameManager()
-        webapp.last_results.clear()
-        self.client = TestClient(webapp.app)
-
-    def _create(self, user_id, name):
-        res = self.client.post("/api/lobby", json={"user_id": user_id, "name": name})
-        self.assertEqual(res.status_code, 200)
-        return res.json()["lobby_id"]
-
+class WebAdapterTests(WebTestBase):
     def test_create_and_check_lobby(self):
-        lobby_id = self._create("host", "Хост")
+        lobby_id = self.create_lobby("host", "Хост")
         res = self.client.get(f"/api/lobby/{lobby_id}").json()
         self.assertTrue(res["exists"])
         self.assertFalse(res["started"])
@@ -46,14 +11,13 @@ class WebAdapterTests(unittest.TestCase):
         self.assertFalse(self.client.get("/api/lobby/0000").json()["exists"])
 
     def test_full_round_worker_accuses_spy(self):
-        lobby_id = self._create("host", "Хост")
+        from adapters.web import app as webapp
 
-        def ws(uid, name):
-            return self.client.websocket_connect(
-                f"/ws/{lobby_id}?user_id={uid}&name={name}"
-            )
+        lobby_id = self.create_lobby("host", "Хост")
 
-        with ws("host", "Хост") as a, ws("p2", "Боб") as b, ws("p3", "Кэрол") as c:
+        with self.ws(lobby_id, "host", "Хост") as a, \
+                self.ws(lobby_id, "p2", "Боб") as b, \
+                self.ws(lobby_id, "p3", "Кэрол") as c:
             socks = {"host": a, "p2": b, "p3": c}
             # Каждое подключение рассылает всем уже подключённым: a видит 3, b — 2, c — 1
             drain(a, 3)
@@ -76,7 +40,3 @@ class WebAdapterTests(unittest.TestCase):
             self.assertEqual(final["status"], "finished")
             self.assertEqual(final["result"]["winner"], "workers")
             self.assertIsNotNone(final["result"]["workplace"])
-
-
-if __name__ == "__main__":
-    unittest.main()

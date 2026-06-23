@@ -5,8 +5,11 @@
 рассылается всем игрокам (персонально, чтобы скрыть роли).
 
 Идентичность — гостевая: фронт генерирует UUID и кладёт в localStorage, сервер
-принимает его как ``user_id``. Здесь нет БД и статистики (это фаза 2).
+принимает его как ``user_id``. Завершённые раунды пишутся в БД для статистики
+(фаза 2) через ``stats_service`` — игровая логика про БД не знает.
 """
+import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -17,8 +20,16 @@ from pydantic import BaseModel
 from game.game_logic import GameManager, GameResult
 from adapters.web import protocol
 from adapters.web.ws_manager import ConnectionManager
+from persistence import db, stats_service
 
-app = FastAPI(title="Spy Game")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await db.init_db()
+    yield
+
+
+app = FastAPI(title="Spy Game", lifespan=lifespan)
 game_manager = GameManager()
 manager = ConnectionManager()
 
@@ -51,13 +62,38 @@ async def check_lobby(lobby_id: str):
     }
 
 
-def _resolve_round(lobby, result_code: str) -> None:
-    """Единая точка завершения раунда: снять снимок итога и сбросить лобби.
+@app.get("/api/users/{user_id}/stats")
+async def user_stats(user_id: str):
+    return await stats_service.get_stats(user_id)
 
-    Сюда же позже подключится запись статистики в БД (фаза 2)."""
+
+async def _resolve_round(lobby, result_code: str) -> None:
+    """Единая точка завершения раунда: снять снимок итога, записать статистику,
+    сбросить лобби. Участники снимаются ДО ``end_game`` (тот обнуляет роли)."""
     winner = "workers" if result_code == "workers_win" else "spy"
     last_results[lobby.lobby_id] = protocol.result_snapshot(lobby, winner)
+
+    participants = [
+        {
+            "user_id": p.user_id,
+            "name": p.display_name,
+            "role": "spy" if p.is_spy else "worker",
+            # шпион победил → побеждает шпион; иначе побеждают работники
+            "is_winner": (winner == "spy") == p.is_spy,
+        }
+        for p in lobby.players
+    ]
+    spy_user_id = lobby.spy.user_id if lobby.spy else None
+    workplace = lobby.current_workplace
+    guessed = lobby.guessed_workplace
+
     lobby.end_game(GameResult.WORKERS_WIN if winner == "workers" else GameResult.SPY_WIN)
+
+    try:
+        await stats_service.record_game(
+            lobby.lobby_id, workplace, winner, spy_user_id, guessed, participants)
+    except Exception as exc:  # БД не должна ломать игру
+        print(f"Не удалось записать статистику: {exc}", file=sys.stderr)
 
 
 async def _broadcast_state(lobby_id: str) -> None:
@@ -95,18 +131,18 @@ async def _handle_action(lobby, user_id: str, msg: dict) -> Optional[str]:
         result = lobby.stop_game_by_worker(user_id, msg.get("target_id"))
         if not result:
             return "Не удалось обвинить игрока"
-        _resolve_round(lobby, result)
+        await _resolve_round(lobby, result)
     elif action == "vote":
         if not lobby.vote(user_id, bool(msg.get("value"))):
             return "Не удалось проголосовать"
         result = lobby.get_vote_result()
         if result:
-            _resolve_round(lobby, result)
+            await _resolve_round(lobby, result)
     elif action == "win":  # ручное решение организатора
         if not is_host:
             return "Только организатор может объявить победителя"
         if lobby.game_started:
-            _resolve_round(lobby, "workers_win" if msg.get("winner") == "workers" else "spy_win")
+            await _resolve_round(lobby, "workers_win" if msg.get("winner") == "workers" else "spy_win")
     elif action == "endgame":  # завершить без результата
         if not is_host:
             return "Только организатор может завершить игру"
@@ -133,6 +169,11 @@ async def game_socket(websocket: WebSocket, lobby_id: str):
         return
     if is_new_player:
         lobby.add_player(user_id, name)
+
+    try:
+        await stats_service.ensure_user(user_id, name)
+    except Exception as exc:
+        print(f"Не удалось сохранить пользователя: {exc}", file=sys.stderr)
 
     await manager.connect(lobby_id, user_id, websocket)
     await _broadcast_state(lobby_id)

@@ -27,7 +27,26 @@ function showError(msg) {
   setTimeout(() => e.classList.add("hidden"), 4000);
 }
 
+// --- Статистика игрока ---
+async function refreshStats() {
+  try {
+    const s = await (await fetch(`/api/users/${encodeURIComponent(USER_ID)}/stats`)).json();
+    const box = el("stats");
+    if (!s.games) {
+      box.classList.add("hidden");
+      return;
+    }
+    box.innerHTML =
+      `📊 Игр: <b>${s.games}</b> · Побед: <b>${s.wins}</b> · Поражений: <b>${s.losses}</b>` +
+      `<br><span class="muted">Был шпионом: ${s.times_spy} (побед: ${s.spy_wins})</span>`;
+    box.classList.remove("hidden");
+  } catch (e) {
+    /* статистика не критична */
+  }
+}
+
 // --- Главный экран ---
+refreshStats();
 el("name-input").value = localStorage.getItem("spy_name") || "";
 el("name-input").addEventListener("change", (e) =>
   localStorage.setItem("spy_name", e.target.value.trim()));

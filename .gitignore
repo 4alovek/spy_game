@@ -208,3 +208,6 @@ __marimo__/
 
 # VSCode
 .vscode
+# Local dev database (phase 2)
+spy_game.db
+*.db-journal

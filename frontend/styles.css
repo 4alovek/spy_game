@@ -102,4 +102,5 @@ button.ghost { background: transparent; border: 1px solid var(--accent-2); color
 .tag { background: var(--accent-2); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; }
 .section-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
 .banner { text-align: center; padding: 14px; background: #11161e; border-radius: 10px; }
+.stats { background: #11161e; padding: 12px 14px; border-radius: 10px; font-size: 0.9rem; text-align: center; }
 .result-win { font-size: 1.3rem; font-weight: 700; text-align: center; }
