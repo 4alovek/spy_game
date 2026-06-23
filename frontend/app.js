@@ -28,25 +28,29 @@ function showError(msg) {
 }
 
 // --- Статистика игрока ---
-async function refreshStats() {
+let myStats = null;
+
+function statsHtml(s) {
+  if (!s) return "";
+  return `📊 Игр: <b>${s.games}</b> · Побед: <b>${s.wins}</b> · Поражений: <b>${s.losses}</b>` +
+    `<br><span class="muted">Был шпионом: ${s.times_spy} (побед: ${s.spy_wins})</span>`;
+}
+
+async function loadStats() {
   try {
-    const s = await (await fetch(`/api/users/${encodeURIComponent(USER_ID)}/stats`)).json();
-    const box = el("stats");
-    if (!s.games) {
-      box.classList.add("hidden");
-      return;
-    }
-    box.innerHTML =
-      `📊 Игр: <b>${s.games}</b> · Побед: <b>${s.wins}</b> · Поражений: <b>${s.losses}</b>` +
-      `<br><span class="muted">Был шпионом: ${s.times_spy} (побед: ${s.spy_wins})</span>`;
-    box.classList.remove("hidden");
+    myStats = await (await fetch(`/api/users/${encodeURIComponent(USER_ID)}/stats`)).json();
   } catch (e) {
-    /* статистика не критична */
+    return; // статистика не критична
+  }
+  const box = el("stats");
+  if (box) {
+    box.innerHTML = statsHtml(myStats);
+    box.classList.remove("hidden");
   }
 }
 
 // --- Главный экран ---
-refreshStats();
+loadStats();
 el("name-input").value = localStorage.getItem("spy_name") || "";
 el("name-input").addEventListener("change", (e) =>
   localStorage.setItem("spy_name", e.target.value.trim()));
@@ -87,6 +91,8 @@ function connect(lobbyId) {
       state = msg;
       accusing = false;
       render();
+      // По завершении раунда подтягиваем свежую статистику и перерисовываем
+      if (state.status === "finished") loadStats().then(render);
     }
   };
   socket.onclose = () => {
@@ -225,7 +231,8 @@ function renderFinished() {
   if (r.yes_votes != null) details += `<br>Голоса — за: ${r.yes_votes}, против: ${r.no_votes}`;
   details += `</div>`;
 
-  return win + details +
+  const stats = myStats ? `<div class="stats">${statsHtml(myStats)}</div>` : "";
+  return win + details + stats +
     (state.is_host
       ? `<button id="start-btn">Новая игра</button>`
       : `<div class="banner muted">Ждём новый раунд от организатора…</div>`);
