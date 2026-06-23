@@ -87,6 +87,7 @@ function connect(lobbyId) {
   socket.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === "error") return showError(msg.message);
+    if (msg.type === "chat") return appendChat(msg);
     if (msg.type === "state") {
       state = msg;
       accusing = false;
@@ -101,7 +102,29 @@ function connect(lobbyId) {
 
   el("home").classList.add("hidden");
   el("game").classList.remove("hidden");
+  el("chat").classList.remove("hidden");
 }
+
+// --- Чат ---
+function appendChat(m) {
+  const box = el("chat-messages");
+  const div = document.createElement("div");
+  div.className = "chat-msg" + (m.user_id === USER_ID ? " mine" : "");
+  div.innerHTML = `<span class="chat-name">${esc(m.name)}</span>${esc(m.text)}`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function sendChat() {
+  const inp = el("chat-input");
+  const text = inp.value.trim();
+  if (!text) return;
+  send("chat", { text });
+  inp.value = "";
+}
+
+el("chat-send").addEventListener("click", sendChat);
+el("chat-input").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
 
 function send(action, extra = {}) {
   if (socket && socket.readyState === WebSocket.OPEN) {

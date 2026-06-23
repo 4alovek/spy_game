@@ -104,6 +104,22 @@ async def _broadcast_state(lobby_id: str) -> None:
     await manager.broadcast(lobby_id, lambda uid: protocol.build_state(lobby, last, uid))
 
 
+async def _broadcast_chat(lobby, user_id: str, text: str) -> None:
+    """Транслировать сообщение чата всем в лобби. Это не состояние —
+    фронт ведёт свой список сообщений отдельно от перерисовки."""
+    text = str(text).strip()[:300]
+    if not text:
+        return
+    player = lobby.get_player(user_id)
+    payload = {
+        "type": "chat",
+        "user_id": user_id,
+        "name": player.display_name if player else "Игрок",
+        "text": text,
+    }
+    await manager.broadcast(lobby.lobby_id, lambda uid: payload)
+
+
 async def _handle_action(lobby, user_id: str, msg: dict) -> Optional[str]:
     """Обработать действие. Возвращает текст ошибки или None."""
     action = msg.get("action")
@@ -181,6 +197,10 @@ async def game_socket(websocket: WebSocket, lobby_id: str):
     try:
         while True:
             msg = await websocket.receive_json()
+            # Чат — отдельный поток сообщений, не вызывает перерисовку состояния
+            if msg.get("action") == "chat":
+                await _broadcast_chat(lobby, user_id, msg.get("text", ""))
+                continue
             error = await _handle_action(lobby, user_id, msg)
             if error:
                 await manager.send_to(lobby_id, user_id, protocol.build_error(error))

@@ -103,4 +103,19 @@ button.ghost { background: transparent; border: 1px solid var(--accent-2); color
 .section-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
 .banner { text-align: center; padding: 14px; background: #11161e; border-radius: 10px; }
 .stats { background: #11161e; padding: 12px 14px; border-radius: 10px; font-size: 0.9rem; text-align: center; }
+
+.chat-messages {
+  background: #11161e;
+  border-radius: 10px;
+  padding: 10px;
+  height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+.chat-msg { padding: 4px 8px; border-radius: 8px; background: #1a212b; align-self: flex-start; max-width: 85%; word-break: break-word; }
+.chat-msg.mine { align-self: flex-end; background: var(--accent-2); }
+.chat-name { color: var(--accent); font-weight: 600; margin-right: 4px; }
 .result-win { font-size: 1.3rem; font-weight: 700; text-align: center; }

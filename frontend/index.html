@@ -30,6 +30,16 @@
 
     <!-- Игровой экран (заполняется из JS) -->
     <section id="game" class="card hidden"></section>
+
+    <!-- Чат лобби (живёт отдельно, чтобы не стираться при перерисовке) -->
+    <section id="chat" class="card hidden">
+      <div class="section-title">💬 Чат</div>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="row">
+        <input id="chat-input" type="text" maxlength="300" placeholder="Сообщение…" />
+        <button id="chat-send" style="flex:0 0 auto">▶</button>
+      </div>
+    </section>
   </div>
 
   <script src="/app.js"></script>
