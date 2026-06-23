@@ -1,1 +1,9 @@
 python-telegram-bot==21.0
+
+# Веб-адаптер (фаза 1)
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# БД и статистика (фаза 2)
+sqlalchemy[asyncio]==2.0.36
+aiosqlite==0.20.0

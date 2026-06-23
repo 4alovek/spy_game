@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🕵️ Шпион</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🕵️ Шпион</h1>
+    </header>
+
+    <div id="error" class="error hidden"></div>
+
+    <!-- Главный экран -->
+    <section id="home" class="card">
+      <div id="stats" class="stats hidden"></div>
+      <label>Ваше имя
+        <input id="name-input" type="text" maxlength="30" placeholder="Например, Аня" />
+      </label>
+      <button id="create-btn">Создать лобби</button>
+      <div class="divider">или</div>
+      <label>ID лобби
+        <input id="join-input" type="text" maxlength="4" inputmode="numeric" placeholder="1234" />
+      </label>
+      <button id="join-btn" class="secondary">Войти в лобби</button>
+    </section>
+
+    <!-- Игровой экран (заполняется из JS) -->
+    <section id="game" class="card hidden"></section>
+
+    <!-- Голосовой чат (WebRTC mesh) -->
+    <section id="voice" class="card hidden">
+      <div class="section-title">🎙️ Голосовой чат</div>
+      <button id="voice-toggle" class="secondary">🎤 Включить голос</button>
+      <div id="voice-list" class="muted"></div>
+    </section>
+
+    <!-- Чат лобби (живёт отдельно, чтобы не стираться при перерисовке) -->
+    <section id="chat" class="card hidden">
+      <div class="section-title">💬 Чат</div>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="row">
+        <input id="chat-input" type="text" maxlength="300" placeholder="Сообщение…" />
+        <button id="chat-send" style="flex:0 0 auto">▶</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

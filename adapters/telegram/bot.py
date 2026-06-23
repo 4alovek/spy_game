@@ -1,7 +1,7 @@
 import os
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
-from game_logic import GameManager, GameResult, Lobby
+from game.game_logic import GameManager, GameResult, Lobby
 
 # Инициализация менеджера игр
 game_manager = GameManager()
@@ -734,7 +734,7 @@ async def closelobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Запуск бота"""
     # Получаем токен из переменной окружения
-    TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8325496741:AAFCyqOzmMgyV25-1Br2d1cR3wI_UHQPjYk")
+    TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
     if not TOKEN:
         print("❌ Ошибка: не установлена переменная окружения TELEGRAM_BOT_TOKEN")
