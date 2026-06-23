@@ -88,6 +88,8 @@ function connect(lobbyId) {
     const msg = JSON.parse(ev.data);
     if (msg.type === "error") return showError(msg.message);
     if (msg.type === "chat") return appendChat(msg);
+    if (msg.type === "voice") return onVoiceRoster(msg.members);
+    if (msg.type === "rtc_signal") return onRtcSignal(msg.from, msg.signal);
     if (msg.type === "state") {
       state = msg;
       accusing = false;
@@ -103,6 +105,7 @@ function connect(lobbyId) {
   el("home").classList.add("hidden");
   el("game").classList.remove("hidden");
   el("chat").classList.remove("hidden");
+  el("voice").classList.remove("hidden");
 }
 
 // --- Чат ---
@@ -125,6 +128,146 @@ function sendChat() {
 
 el("chat-send").addEventListener("click", sendChat);
 el("chat-input").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
+
+// --- Голосовой чат (WebRTC mesh) ---
+// Сервер только релеит сигналинг; аудио идёт peer-to-peer между всеми парами.
+const RTC_CONFIG = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+let localStream = null;
+let voiceOn = false;
+const peers = {};            // peerId -> { pc, pendingCandidates, haveRemote }
+let lastRoster = [];
+
+const cssId = (id) => "audio-" + id.replace(/[^a-zA-Z0-9_-]/g, "");
+
+async function toggleVoice() {
+  if (voiceOn) return leaveVoice();
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch (e) {
+    return showError("Нет доступа к микрофону");
+  }
+  voiceOn = true;
+  updateVoiceUI();
+  send("voice_join");
+}
+
+function leaveVoice() {
+  voiceOn = false;
+  send("voice_leave");
+  Object.keys(peers).forEach(closePeer);
+  if (localStream) {
+    localStream.getTracks().forEach((t) => t.stop());
+    localStream = null;
+  }
+  updateVoiceUI();
+  updateVoiceList(lastRoster);
+}
+
+function closePeer(peerId) {
+  const p = peers[peerId];
+  if (p) { try { p.pc.close(); } catch (e) { /* already closed */ } }
+  delete peers[peerId];
+  const au = document.getElementById(cssId(peerId));
+  if (au) au.remove();
+}
+
+function createPeer(peerId, initiator) {
+  const pc = new RTCPeerConnection(RTC_CONFIG);
+  const entry = { pc, pendingCandidates: [], haveRemote: false };
+  peers[peerId] = entry;
+
+  localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+
+  pc.onicecandidate = (e) => {
+    if (e.candidate) send("rtc_signal", { to: peerId, signal: { candidate: e.candidate } });
+  };
+  pc.ontrack = (e) => {
+    let au = document.getElementById(cssId(peerId));
+    if (!au) {
+      au = document.createElement("audio");
+      au.id = cssId(peerId);
+      au.autoplay = true;
+      document.body.appendChild(au);
+    }
+    au.srcObject = e.streams[0];
+  };
+
+  if (initiator) {
+    pc.createOffer()
+      .then((o) => pc.setLocalDescription(o))
+      .then(() => send("rtc_signal", { to: peerId, signal: { sdp: pc.localDescription } }))
+      .catch(() => {});
+  }
+  return entry;
+}
+
+function onVoiceRoster(members) {
+  lastRoster = members || [];
+  updateVoiceList(lastRoster);
+  if (!voiceOn) return;
+
+  const others = lastRoster.filter((m) => m !== USER_ID);
+  // Новые пиры: инициирует тот, у кого id меньше (детерминированно — без glare)
+  others.forEach((peerId) => {
+    if (!peers[peerId]) createPeer(peerId, USER_ID < peerId);
+  });
+  // Ушедшие пиры: закрываем соединение
+  Object.keys(peers).forEach((peerId) => {
+    if (!others.includes(peerId)) closePeer(peerId);
+  });
+}
+
+async function onRtcSignal(from, signal) {
+  if (!voiceOn || !signal) return;
+  // Сигнал мог прийти раньше, чем разобрали ростер — создаём пира как отвечающего
+  let entry = peers[from] || createPeer(from, false);
+  const pc = entry.pc;
+
+  try {
+    if (signal.sdp) {
+      await pc.setRemoteDescription(signal.sdp);
+      entry.haveRemote = true;
+      for (const c of entry.pendingCandidates) {
+        try { await pc.addIceCandidate(c); } catch (e) { /* ignore */ }
+      }
+      entry.pendingCandidates = [];
+      if (signal.sdp.type === "offer") {
+        const ans = await pc.createAnswer();
+        await pc.setLocalDescription(ans);
+        send("rtc_signal", { to: from, signal: { sdp: pc.localDescription } });
+      }
+    } else if (signal.candidate) {
+      if (entry.haveRemote) await pc.addIceCandidate(signal.candidate);
+      else entry.pendingCandidates.push(signal.candidate);
+    }
+  } catch (e) {
+    /* нестрашные гонки согласования игнорируем */
+  }
+}
+
+function updateVoiceUI() {
+  const btn = el("voice-toggle");
+  if (!btn) return;
+  btn.textContent = voiceOn ? "🔇 Выключить голос" : "🎤 Включить голос";
+  btn.classList.toggle("danger", voiceOn);
+  btn.classList.toggle("secondary", !voiceOn);
+}
+
+function memberName(id) {
+  if (id === USER_ID) return "вы";
+  const p = state && state.players.find((x) => x.id === id);
+  return p ? p.name : "Игрок";
+}
+
+function updateVoiceList(members) {
+  const box = el("voice-list");
+  if (!box) return;
+  box.textContent = members && members.length
+    ? "🎙️ В голосе: " + members.map(memberName).join(", ")
+    : "В голосе никого";
+}
+
+el("voice-toggle").addEventListener("click", toggleVoice);
 
 function send(action, extra = {}) {
   if (socket && socket.readyState === WebSocket.OPEN) {

@@ -36,6 +36,9 @@ manager = ConnectionManager()
 # lobby_id -> снимок итога последнего раунда (показывается до следующего старта)
 last_results: Dict[str, dict] = {}
 
+# lobby_id -> множество user_id, кто сейчас в голосовом чате (WebRTC mesh)
+voice_members: Dict[str, set] = {}
+
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
 
@@ -120,6 +123,35 @@ async def _broadcast_chat(lobby, user_id: str, text: str) -> None:
     await manager.broadcast(lobby.lobby_id, lambda uid: payload)
 
 
+async def _broadcast_voice(lobby_id: str) -> None:
+    """Разослать актуальный состав голосового чата всем в лобби."""
+    members = sorted(voice_members.get(lobby_id, set()))
+    payload = {"type": "voice", "members": members}
+    await manager.broadcast(lobby_id, lambda uid: payload)
+
+
+async def _handle_voice(lobby_id: str, user_id: str, msg: dict) -> None:
+    """Сигнализация WebRTC. Сервер только релеит SDP/ICE между пирами —
+    сама медиа идёт peer-to-peer (mesh), сервер её не видит."""
+    action = msg.get("action")
+    members = voice_members.setdefault(lobby_id, set())
+
+    if action == "voice_join":
+        members.add(user_id)
+        await _broadcast_voice(lobby_id)
+    elif action == "voice_leave":
+        members.discard(user_id)
+        await _broadcast_voice(lobby_id)
+    elif action == "rtc_signal":
+        to = msg.get("to")
+        if to:
+            await manager.send_to(lobby_id, to, {
+                "type": "rtc_signal",
+                "from": user_id,
+                "signal": msg.get("signal"),
+            })
+
+
 async def _handle_action(lobby, user_id: str, msg: dict) -> Optional[str]:
     """Обработать действие. Возвращает текст ошибки или None."""
     action = msg.get("action")
@@ -197,9 +229,13 @@ async def game_socket(websocket: WebSocket, lobby_id: str):
     try:
         while True:
             msg = await websocket.receive_json()
-            # Чат — отдельный поток сообщений, не вызывает перерисовку состояния
-            if msg.get("action") == "chat":
+            action = msg.get("action")
+            # Чат и голос — отдельные потоки, не вызывают перерисовку состояния
+            if action == "chat":
                 await _broadcast_chat(lobby, user_id, msg.get("text", ""))
+                continue
+            if action in ("voice_join", "voice_leave", "rtc_signal"):
+                await _handle_voice(lobby_id, user_id, msg)
                 continue
             error = await _handle_action(lobby, user_id, msg)
             if error:
@@ -207,6 +243,11 @@ async def game_socket(websocket: WebSocket, lobby_id: str):
             await _broadcast_state(lobby_id)
     except WebSocketDisconnect:
         manager.disconnect(lobby_id, user_id)
+        # Выходим из голосового чата и уведомляем пиров, чтобы закрыли соединение
+        members = voice_members.get(lobby_id)
+        if members and user_id in members:
+            members.discard(user_id)
+            await _broadcast_voice(lobby_id)
         # В режиме ожидания убираем отключившегося из лобби; во время игры
         # оставляем (позволяет переподключиться).
         if not lobby.game_started:

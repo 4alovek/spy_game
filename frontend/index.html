@@ -31,6 +31,13 @@
     <!-- Игровой экран (заполняется из JS) -->
     <section id="game" class="card hidden"></section>
 
+    <!-- Голосовой чат (WebRTC mesh) -->
+    <section id="voice" class="card hidden">
+      <div class="section-title">🎙️ Голосовой чат</div>
+      <button id="voice-toggle" class="secondary">🎤 Включить голос</button>
+      <div id="voice-list" class="muted"></div>
+    </section>
+
     <!-- Чат лобби (живёт отдельно, чтобы не стираться при перерисовке) -->
     <section id="chat" class="card hidden">
       <div class="section-title">💬 Чат</div>
