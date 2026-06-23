@@ -211,3 +211,6 @@ __marimo__/
 # Local dev database (phase 2)
 spy_game.db
 *.db-journal
+
+# Self-signed TLS certs for LAN testing (make certs / make run-web-tls)
+certs/
