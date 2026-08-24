@@ -112,29 +112,30 @@ class BotHandlersTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Укажите имя", msg.replies[0]["text"])
 
     async def test_setname_updates_player_display_name(self):
-        lobby_id = bot.game_manager.create_lobby(999, "org")
+        lobby_id = bot.game_manager.create_lobby("tg:999", "org")
         lobby = bot.game_manager.get_lobby(lobby_id)
-        lobby.add_player(1, "alice")
+        lobby.add_player("tg:1", "alice")
 
         update, context, msg, _ = self._make_update_and_context(1, username="alice", args=["Агент", "А"])
         await bot.setname(update, context)
 
-        self.assertEqual(lobby.get_player(1).display_name, "Агент А")
+        self.assertEqual(lobby.get_player("tg:1").display_name, "Агент А")
         self.assertIn("изменено", msg.replies[0]["text"])
 
     async def test_addplace_adds_workplace_and_broadcasts(self):
-        lobby_id = bot.game_manager.create_lobby(999, "org")
+        lobby_id = bot.game_manager.create_lobby("tg:999", "org")
         lobby = bot.game_manager.get_lobby(lobby_id)
-        lobby.add_player(1, "alice")
-        lobby.add_player(2, "bob")
+        lobby.add_player("tg:1", "alice")
+        lobby.add_player("tg:2", "bob")
 
         update, context, msg, fake_bot = self._make_update_and_context(1, username="alice", args=["Коворкинг"])
         await bot.addplace(update, context)
 
         self.assertIn("Коворкинг", lobby.custom_workplaces)
         self.assertIn("добавлено", msg.replies[0]["text"])
-        self.assertEqual(len(fake_bot.sent), 2)
-        self.assertTrue(all("Коворкинг" in item["text"] for item in fake_bot.sent))
+        # Рассылка выполняется event-notifier'ом единого runtime; unit-тест
+        # обработчика проверяет само действие и личное подтверждение.
+        self.assertEqual(fake_bot.sent, [])
 
     async def test_join_without_lobby_id(self):
         update, context, msg, _ = self._make_update_and_context(1, args=[])

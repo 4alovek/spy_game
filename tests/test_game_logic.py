@@ -52,7 +52,7 @@ class LobbyGameLogicTests(unittest.TestCase):
         self.assertTrue(self.lobby.set_spy_guess("Школа"))
         self.assertTrue(self.lobby.vote(workers[0].user_id, True))
         self.assertTrue(self.lobby.vote(workers[1].user_id, True))
-        self.assertEqual(self.lobby.get_vote_result(), "spy_win")
+        self.assertEqual(self.lobby.get_vote_result(), GameResult.SPY_WIN)
 
     def test_end_game_resets_round_state(self):
         with patch("game.game_logic.random.choice", side_effect=["Театр", self.lobby.players[2]]):

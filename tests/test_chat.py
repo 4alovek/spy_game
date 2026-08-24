@@ -1,4 +1,4 @@
-from web_base import WebTestBase, drain
+from web_base import WebTestBase, drain, canonical_web_id
 
 
 class ChatTests(WebTestBase):
@@ -18,7 +18,7 @@ class ChatTests(WebTestBase):
                 self.assertEqual(msg["type"], "chat")
                 self.assertEqual(msg["name"], "Хост")
                 self.assertEqual(msg["text"], "Всем привет")
-                self.assertEqual(msg["user_id"], "host")
+                self.assertEqual(msg["user_id"], canonical_web_id("host"))
 
     def test_blank_chat_is_ignored(self):
         lobby_id = self.create_lobby("host", "Хост")

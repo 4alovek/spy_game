@@ -10,7 +10,7 @@ class GameResult(Enum):
 
 
 class Player:
-    def __init__(self, user_id: int, username: str, display_name: Optional[str] = None):
+    def __init__(self, user_id: str, username: str, display_name: Optional[str] = None):
         self.user_id = user_id
         self.username = username
         self.display_name = display_name or username  # Игровое имя
@@ -43,9 +43,9 @@ class Lobby:
         self.stopped_by: Optional[Player] = None
         self.accused_player: Optional[Player] = None  # Кого обвинил работник
         self.guessed_workplace: Optional[str] = None  # Что угадал шпион
-        self.votes: Dict[int, bool] = {}  # user_id -> голос (True = Да, False = Нет)
+        self.votes: Dict[str, bool] = {}  # user_id -> голос (True = Да, False = Нет)
     
-    def add_player(self, user_id: int, username: str, display_name: Optional[str] = None) -> bool:
+    def add_player(self, user_id: str, username: str, display_name: Optional[str] = None) -> bool:
         """Добавить игрока в лобби. Возвращает True если успешно."""
         if self.game_started:
             return False
@@ -58,7 +58,7 @@ class Lobby:
         self.players.append(player)
         return True
     
-    def remove_player(self, user_id: int) -> bool:
+    def remove_player(self, user_id: str) -> bool:
         """Удалить игрока из лобби. Возвращает True если успешно."""
         if self.game_started:
             return False
@@ -114,7 +114,7 @@ class Lobby:
             player.is_spy = False
             player.workplace = None
     
-    def get_player_role_info(self, user_id: int) -> Optional[Dict]:
+    def get_player_role_info(self, user_id: str) -> Optional[Dict]:
         """Получить информацию о роли игрока."""
         if not self.game_started:
             return None
@@ -133,11 +133,11 @@ class Lobby:
         """Получить список имён игроков."""
         return [p.display_name for p in self.players]
     
-    def get_player(self, user_id: int) -> Optional[Player]:
+    def get_player(self, user_id: str) -> Optional[Player]:
         """Получить игрока по user_id."""
         return next((p for p in self.players if p.user_id == user_id), None)
     
-    def set_player_name(self, user_id: int, name: str) -> bool:
+    def set_player_name(self, user_id: str, name: str) -> bool:
         """Установить игровое имя игроку. Возвращает True если успешно."""
         player = self.get_player(user_id)
         if player and not self.game_started:
@@ -160,7 +160,7 @@ class Lobby:
         """Получить список всех мест работы (стандартные + кастомные)."""
         return self.WORKPLACES + self.custom_workplaces
     
-    def stop_game_by_worker(self, user_id: int, accused_id: int) -> Optional[str]:
+    def stop_game_by_worker(self, user_id: str, accused_id: str) -> Optional[GameResult]:
         """Остановка игры работником с обвинением. Возвращает результат или None."""
         if not self.game_started or self.game_stopped:
             return None
@@ -177,11 +177,11 @@ class Lobby:
         
         # Проверяем правильность обвинения
         if accused.is_spy:
-            return "workers_win"
+            return GameResult.WORKERS_WIN
         else:
-            return "spy_win"
+            return GameResult.SPY_WIN
     
-    def stop_game_by_spy(self, user_id: int) -> bool:
+    def stop_game_by_spy(self, user_id: str) -> bool:
         """Остановка игры шпионом. Возвращает True если успешно."""
         if not self.game_started or self.game_stopped:
             return False
@@ -203,7 +203,7 @@ class Lobby:
         self.guessed_workplace = workplace
         return True
     
-    def vote(self, user_id: int, vote: bool) -> bool:
+    def vote(self, user_id: str, vote: bool) -> bool:
         """Проголосовать (только для работников). Возвращает True если успешно."""
         player = self.get_player(user_id)
         
@@ -213,7 +213,7 @@ class Lobby:
         self.votes[user_id] = vote
         return True
     
-    def get_vote_result(self) -> Optional[str]:
+    def get_vote_result(self) -> Optional[GameResult]:
         """Подсчитать голоса и определить победителя. Возвращает результат или None."""
         if not self.guessed_workplace:
             return None
@@ -228,15 +228,15 @@ class Lobby:
         
         # Для победы шпиона нужно больше половины голосов "Да"
         if yes_votes > workers_count / 2:
-            return "spy_win"
+            return GameResult.SPY_WIN
         else:
-            return "workers_win"
+            return GameResult.WORKERS_WIN
     
     def get_workers(self) -> List[Player]:
         """Получить список работников."""
         return [p for p in self.players if not p.is_spy]
     
-    def is_organizer(self, user_id: int) -> bool:
+    def is_organizer(self, user_id: str) -> bool:
         """Проверить, является ли пользователь организатором."""
         return user_id == self.organizer_id
 
@@ -245,7 +245,7 @@ class GameManager:
     def __init__(self):
         self.lobbies: Dict[str, Lobby] = {}
     
-    def create_lobby(self, organizer_id: int, organizer_username: str) -> str:
+    def create_lobby(self, organizer_id: str, organizer_username: str) -> str:
         """Создать новое лобби. Возвращает ID лобби."""
         lobby_id = self._generate_lobby_id()
         lobby = Lobby(lobby_id, organizer_id, organizer_username)

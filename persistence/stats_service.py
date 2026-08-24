@@ -9,11 +9,11 @@ from persistence import db
 from persistence.models import Game, GamePlayer, User
 
 
-async def ensure_user(user_id: str, display_name: str) -> None:
+async def ensure_user(user_id: str, display_name: str, auth_provider: str = "guest") -> None:
     async with db.session() as s:
         user = await s.get(User, user_id)
         if user is None:
-            s.add(User(id=user_id, display_name=display_name))
+            s.add(User(id=user_id, display_name=display_name, auth_provider=auth_provider))
         elif display_name:
             user.display_name = display_name
         await s.commit()

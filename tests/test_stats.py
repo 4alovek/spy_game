@@ -1,4 +1,4 @@
-from web_base import WebTestBase, drain
+from web_base import WebTestBase, drain, canonical_web_id, guest_id
 
 
 class StatsTests(WebTestBase):
@@ -16,7 +16,11 @@ class StatsTests(WebTestBase):
         with self.ws(lobby_id, "host", "Хост") as a, \
                 self.ws(lobby_id, "p2", "Боб") as b, \
                 self.ws(lobby_id, "p3", "Кэрол") as c:
-            socks = {"host": a, "p2": b, "p3": c}
+            socks = {
+                canonical_web_id("host"): a,
+                canonical_web_id("p2"): b,
+                canonical_web_id("p3"): c,
+            }
             drain(a, 3)
             drain(b, 2)
             drain(c, 1)
@@ -33,8 +37,16 @@ class StatsTests(WebTestBase):
             socks[accuser_id].send_json({"action": "accuse", "target_id": spy_id})
             drain(socks[accuser_id], 1)
 
+        # Маппинг canonical_id -> raw_id для API
+        raw_ids = {
+            canonical_web_id("host"): guest_id("host"),
+            canonical_web_id("p2"): guest_id("p2"),
+            canonical_web_id("p3"): guest_id("p3"),
+        }
+
         # Шпион проиграл
-        spy = self.client.get(f"/api/users/{spy_id}/stats").json()
+        spy_raw_id = raw_ids[spy_id]
+        spy = self.client.get(f"/api/users/{spy_raw_id}/stats").json()
         self.assertEqual(spy["games"], 1)
         self.assertEqual(spy["wins"], 0)
         self.assertEqual(spy["losses"], 1)
@@ -42,8 +54,8 @@ class StatsTests(WebTestBase):
         self.assertEqual(spy["spy_wins"], 0)
 
         # Работник победил
-        worker_id = next(uid for uid in socks if uid != spy_id)
-        worker = self.client.get(f"/api/users/{worker_id}/stats").json()
+        worker_raw_id = raw_ids[accuser_id]
+        worker = self.client.get(f"/api/users/{worker_raw_id}/stats").json()
         self.assertEqual(worker["games"], 1)
         self.assertEqual(worker["wins"], 1)
         self.assertEqual(worker["losses"], 0)

@@ -1,0 +1,69 @@
+@startuml
+title Кроссплатформенный раунд: веб-хост, Telegram-игрок и общий координатор
+autonumber
+
+actor "Веб-хост" as host
+boundary "Веб-клиент" as web
+control "FastAPI\nweb adapter" as web_api
+control "GameCoordinator" as game
+control "Telegram adapter" as tg
+boundary "Telegram Bot API" as tg_api
+actor "Telegram-игрок" as player
+database "PostgreSQL" as db
+
+host -> web : Создать лобби
+web -> web_api : POST /api/lobby\nguest UUID, имя
+web_api -> game : create_lobby(web:<uuid>)
+game --> web_api : код лобби; хост добавлен игроком
+web_api --> web : код лобби
+
+player -> tg_api : /join <код>
+tg_api -> tg : update
+tg -> game : join(tg:<id>, имя)
+game -> web_api : lobby_changed
+web_api --> web : персональный state по WebSocket
+game -> tg : lobby_changed
+tg -> tg_api : DM о входе в лобби
+tg_api --> player : уведомление
+
+host -> web : Начать игру
+web -> web_api : WS { action: start }
+web_api -> game : start(web:<uuid>)
+game -> web_api : round_started + персональные роли
+web_api --> web : state (роль видна только владельцу)
+game -> tg : round_started
+tg -> tg_api : DM «Игра началась»
+tg_api --> player : /role показывает личную роль
+
+player -> tg_api : stop + /guess <место>
+tg_api -> tg : callback и команда
+tg -> game : stop_spy(), guess()
+game -> web_api : voting_started
+web_api --> web : state для голосования
+game -> tg : voting_started
+tg -> tg_api : inline-кнопки «Да/Нет» работникам
+
+host -> web : Проголосовать
+web -> web_api : WS { action: vote }
+web_api -> game : vote(web:<uuid>)
+
+alt Все работники проголосовали
+  game -> game : resolve_round() под lock
+  game -> db : записать Game и GamePlayer
+  game -> web_api : round_finished
+  web_api --> web : state с результатом
+  game -> tg : round_finished
+  tg -> tg_api : итоговый DM
+  tg_api --> player : результат раунда
+else Ожидаются остальные голоса
+  game -> web_api : voting_progress
+  web_api --> web : обновлённый state
+end
+
+note over game
+  Одинаково работают действия,
+  инициированные из веба и Telegram.
+  Роль и workplace никогда не рассылаются
+  другим игрокам.
+end note
+@enduml

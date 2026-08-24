@@ -5,6 +5,7 @@
 import os
 import tempfile
 import unittest
+import uuid
 
 try:
     from fastapi.testclient import TestClient
@@ -17,6 +18,14 @@ if HAS_DEPS:
     from adapters.web import app as webapp
     from persistence import db
     from game.game_logic import GameManager
+
+
+def guest_id(label):
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"spy-game-test:{label}"))
+
+
+def canonical_web_id(label):
+    return f"web:{guest_id(label)}"
 
 
 def drain(ws, n):
@@ -36,8 +45,8 @@ def drain(ws, n):
 class WebTestBase(unittest.TestCase):
     def setUp(self):
         # Чистое состояние на каждый тест (модульные глобалы переиспользуются)
-        webapp.game_manager = GameManager()
-        webapp.last_results.clear()
+        webapp.coordinator.reset(GameManager())
+        webapp.game_manager = webapp.coordinator.game_manager
 
         self._tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self._tmp.close()
@@ -51,9 +60,9 @@ class WebTestBase(unittest.TestCase):
         os.unlink(self._tmp.name)
 
     def create_lobby(self, user_id, name):
-        res = self.client.post("/api/lobby", json={"user_id": user_id, "name": name})
+        res = self.client.post("/api/lobby", json={"user_id": guest_id(user_id), "name": name})
         self.assertEqual(res.status_code, 200)
         return res.json()["lobby_id"]
 
     def ws(self, lobby_id, uid, name):
-        return self.client.websocket_connect(f"/ws/{lobby_id}?user_id={uid}&name={name}")
+        return self.client.websocket_connect(f"/ws/{lobby_id}?user_id={guest_id(uid)}&name={name}")

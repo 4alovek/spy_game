@@ -26,6 +26,7 @@ def build_state(lobby: Lobby, last_result: Optional[dict], user_id: str) -> dict
     data = {
         "type": "state",
         "lobby_id": lobby.lobby_id,
+        "me_id": user_id,
         "status": status,
         "is_host": lobby.is_organizer(user_id),
         "organizer": lobby.organizer_username,

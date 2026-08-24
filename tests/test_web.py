@@ -1,4 +1,4 @@
-from web_base import WebTestBase, drain
+from web_base import WebTestBase, canonical_web_id, drain
 
 
 class WebAdapterTests(WebTestBase):
@@ -18,7 +18,7 @@ class WebAdapterTests(WebTestBase):
         with self.ws(lobby_id, "host", "Хост") as a, \
                 self.ws(lobby_id, "p2", "Боб") as b, \
                 self.ws(lobby_id, "p3", "Кэрол") as c:
-            socks = {"host": a, "p2": b, "p3": c}
+            socks = {canonical_web_id("host"): a, canonical_web_id("p2"): b, canonical_web_id("p3"): c}
             # Каждое подключение рассылает всем уже подключённым: a видит 3, b — 2, c — 1
             drain(a, 3)
             drain(b, 2)

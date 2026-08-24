@@ -3,9 +3,12 @@
 // --- Гостевая идентичность: UUID в localStorage (задел под Telegram Login позже) ---
 function guestId() {
   let id = localStorage.getItem("spy_user_id");
-  if (!id) {
+  if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
     id = (crypto.randomUUID && crypto.randomUUID()) ||
-      "g-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = Math.floor(Math.random() * 16);
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+      });
     localStorage.setItem("spy_user_id", id);
   }
   return id;
@@ -15,6 +18,7 @@ const USER_ID = guestId();
 let socket = null;
 let state = null;        // последний снимок от сервера
 let accusing = false;    // локальный шаг: работник выбирает, кого обвинить
+let PLAYER_ID = null;    // канонический ID, назначенный сервером (web:<uuid>)
 
 const el = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
@@ -92,6 +96,7 @@ function connect(lobbyId) {
     if (msg.type === "rtc_signal") return onRtcSignal(msg.from, msg.signal);
     if (msg.type === "state") {
       state = msg;
+      PLAYER_ID = msg.me_id;
       accusing = false;
       render();
       // По завершении раунда подтягиваем свежую статистику и перерисовываем
@@ -112,7 +117,7 @@ function connect(lobbyId) {
 function appendChat(m) {
   const box = el("chat-messages");
   const div = document.createElement("div");
-  div.className = "chat-msg" + (m.user_id === USER_ID ? " mine" : "");
+  div.className = "chat-msg" + (m.user_id === PLAYER_ID ? " mine" : "");
   div.innerHTML = `<span class="chat-name">${esc(m.name)}</span>${esc(m.text)}`;
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
@@ -140,6 +145,7 @@ let lastRoster = [];
 const cssId = (id) => "audio-" + id.replace(/[^a-zA-Z0-9_-]/g, "");
 
 async function toggleVoice() {
+  if (!window.isSecureContext) return showError("Голосовой чат требует HTTPS");
   if (voiceOn) return leaveVoice();
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -206,10 +212,10 @@ function onVoiceRoster(members) {
   updateVoiceList(lastRoster);
   if (!voiceOn) return;
 
-  const others = lastRoster.filter((m) => m !== USER_ID);
+  const others = lastRoster.filter((m) => m !== PLAYER_ID);
   // Новые пиры: инициирует тот, у кого id меньше (детерминированно — без glare)
   others.forEach((peerId) => {
-    if (!peers[peerId]) createPeer(peerId, USER_ID < peerId);
+    if (!peers[peerId]) createPeer(peerId, PLAYER_ID < peerId);
   });
   // Ушедшие пиры: закрываем соединение
   Object.keys(peers).forEach((peerId) => {
@@ -254,7 +260,7 @@ function updateVoiceUI() {
 }
 
 function memberName(id) {
-  if (id === USER_ID) return "вы";
+  if (id === PLAYER_ID) return "вы";
   const p = state && state.players.find((x) => x.id === id);
   return p ? p.name : "Игрок";
 }
@@ -268,6 +274,10 @@ function updateVoiceList(members) {
 }
 
 el("voice-toggle").addEventListener("click", toggleVoice);
+if (!window.isSecureContext) {
+  el("voice-toggle").disabled = true;
+  el("voice-list").textContent = "Голосовой чат требует HTTPS";
+}
 
 function send(action, extra = {}) {
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -318,6 +328,7 @@ function renderWaiting() {
            ${enough ? "Начать игру" : `Нужно минимум ${state.min_players} игрока`}
          </button>`
       : `<div class="banner muted">Ждём, пока организатор начнёт игру…</div>`}
+    <button id="leave-btn" class="ghost">Покинуть лобби</button>
   `;
 }
 
@@ -442,4 +453,5 @@ function bind() {
   on("win-workers", "click", () => send("win", { winner: "workers" }));
   on("win-spy", "click", () => send("win", { winner: "spy" }));
   on("endgame-btn", "click", () => send("endgame"));
+  on("leave-btn", "click", () => send("leave"));
 }

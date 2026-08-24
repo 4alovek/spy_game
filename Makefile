@@ -1,5 +1,6 @@
 PYTHON ?= python
 BOT_MODULE ?= adapters.telegram.bot
+APP_MODULE ?= adapters.runtime:app
 WEB_HOST ?= 127.0.0.1
 WEB_PORT ?= 8000
 LOG_FILE ?= bot.log
@@ -13,17 +14,25 @@ KEY_FILE ?= $(CERT_DIR)/key.pem
 # IP put into the certificate's subjectAltName; defaults to the machine's LAN IP
 CERT_IP ?= $(shell ip -4 addr show 2>/dev/null | grep -oP '(?<=inet\s)192\.168\.\d+\.\d+' | head -n1)
 
-.PHONY: run run-bg run-web run-web-tls certs test status logs stop restart
+.PHONY: run run-bg run-bot run-web run-unified run-web-tls certs test status logs stop restart
 
 run:
-	$(PYTHON) -m $(BOT_MODULE)
+	$(PYTHON) -m uvicorn $(APP_MODULE) --host $(WEB_HOST) --port $(WEB_PORT)
 
 run-bg:
-	nohup $(PYTHON) -m $(BOT_MODULE) > $(LOG_FILE) 2>&1 & echo $$! > $(PID_FILE)
-	@echo "Bot started in background. PID: $$(cat $(PID_FILE))"
+	nohup $(PYTHON) -m uvicorn $(APP_MODULE) --host $(WEB_HOST) --port $(WEB_PORT) > $(LOG_FILE) 2>&1 & echo $$! > $(PID_FILE)
+	@echo "Application started in background. PID: $$(cat $(PID_FILE))"
+
+# Отдельный бот полезен только для отладки: с вебом он не разделяет лобби.
+run-bot:
+	$(PYTHON) -m $(BOT_MODULE)
 
 run-web:
-	$(PYTHON) -m uvicorn adapters.web.app:app --host $(WEB_HOST) --port $(WEB_PORT) --reload
+	$(PYTHON) -m uvicorn $(APP_MODULE) --host $(WEB_HOST) --port $(WEB_PORT) --reload
+
+# Единый процесс: при TELEGRAM_BOT_TOKEN поднимает и FastAPI, и polling бота.
+run-unified:
+	$(PYTHON) -m uvicorn $(APP_MODULE) --host $(WEB_HOST) --port $(WEB_PORT) --reload
 
 certs:
 	@mkdir -p $(CERT_DIR)

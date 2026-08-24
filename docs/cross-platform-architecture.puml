@@ -1,0 +1,56 @@
+@startuml
+title "Шпион" — кроссплатформенная архитектура
+left to right direction
+skinparam componentStyle rectangle
+
+actor "Веб-игрок" as web_player
+actor "Telegram-игрок" as tg_player
+
+rectangle "Браузер" as browser {
+  component "Vanilla JS\nWebSocket-клиент" as web_client
+}
+
+cloud "Telegram Bot API" as telegram_api
+database "PostgreSQL" as postgres
+
+node "Docker: app" as app {
+  component "FastAPI\nREST + WebSocket" as web_adapter
+  component "Telegram adapter\nкоманды и inline-кнопки" as tg_adapter
+  component "GameCoordinator\nлобби, блокировки,\nзавершение раунда" as coordinator
+  component "In-memory LobbyStore" as store
+  component "EventPublisher\nпроекции для клиентов" as publisher
+  component "StatsService" as stats
+}
+
+web_player --> web_client
+web_client <--> web_adapter : HTTPS/WSS в будущем\nHTTP/WS в первой VPS-версии
+tg_player <--> telegram_api
+telegram_api <--> tg_adapter : polling
+
+web_adapter --> coordinator : действия веб-игрока
+tg_adapter --> coordinator : действия Telegram-игрока
+coordinator --> store : состояние лобби
+coordinator --> publisher : доменные события
+publisher --> web_adapter : персональные state-снимки
+publisher --> tg_adapter : DM и кнопки
+coordinator --> stats : итог раунда
+stats --> postgres
+
+note bottom of coordinator
+  Канонические ID:
+  web:<guest_uuid>
+  tg:<telegram_id>
+end note
+
+note bottom of app
+  Один процесс = одно общее состояние.
+  Redis/pub-sub — будущая замена
+  LobbyStore и EventPublisher при масштабировании.
+end note
+
+note bottom of web_client
+  Чат и WebRTC-голос остаются
+  только веб-функциями.
+  Голос требует HTTPS.
+end note
+@enduml
